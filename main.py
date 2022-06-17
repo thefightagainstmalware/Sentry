@@ -24,13 +24,16 @@ def build_json_data(
     if original_data is None:
         return new_data
     for k, v in original_data.items():
-        new_data[k] = v["discord_username"]
+        new_data[k] = v["discord_id"]
     return new_data
 
 load_dotenv()
 
 client = discord.Bot(debug_guilds=[910733698452815912])
-
+if not os.path.exists("players.json"):
+    with open("players.json", "w") as f:
+        json.dump({}, f)
+    
 watched_players = build_dict_data(json.load(open("players.json"))) or {}
 
 
