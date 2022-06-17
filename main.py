@@ -1,7 +1,7 @@
-import json, discord, aiohttp, os, re, urllib.parse
+import json, discord, aiohttp, os, re
 from discord.ext import tasks  # type: ignore
 from dotenv import load_dotenv
-from typing import Optional, Dict, Tuple
+from typing import Dict, Tuple
 
 
 class CustomClient(discord.Bot):
@@ -132,7 +132,8 @@ async def watch(ctx: discord.ApplicationContext, username: str):
         return
     elif discord_username != str(ctx.author):
         if discord_invite.match(discord_username):
-            url = urllib.parse.unquote(discord_username)
+            print("Found invite")
+            url = discord_username
             try:
                 invite = await client.fetch_invite(url)
             except discord.NotFound:
@@ -145,15 +146,16 @@ async def watch(ctx: discord.ApplicationContext, username: str):
                     f"It looks like there's an invite ({url}) in your Hypixel profile's discord, but it doesn't have an inviter! <@{client.owner_id}> investigate!"
                 )
                 return
-            if invite.inviter.id != client.owner_id:  # type: ignore
+            if invite.inviter.id != ctx.author.id:  # type: ignore
                 await ctx.respond(
                     f"It looks like there's an invite ({url}) in your Hypixel profile's discord, but you didn't create it!"
                 )
                 return
-        await ctx.respond(
-            f"Your MC account is linked to {discord_username}'s discord account! Change it to {ctx.author}"
-        )
-        return
+        else:
+            await ctx.respond(
+                f"Your MC account is linked to {discord_username}'s discord account! Change it to {ctx.author}"
+            )
+            return
     watched_players[uuid] = {"discord_id": ctx.author.id, "is_online": False}  # type: ignore
     await ctx.respond(f"Your account is now being watched!")
     json.dump(build_json_data(watched_players), open("players.json", "w"))
