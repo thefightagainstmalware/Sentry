@@ -64,7 +64,7 @@ async def is_player_online(uuid: str) -> bool:
                     return False
                 if (
                     "lastLogin" not in data["player"]
-                    or data["lastLogout"] not in data["player"]
+                    or "lastLogout" not in data["player"]
                 ):
                     return False  # appear offline
                 return (data["player"]["lastLogin"] or 0) > (
