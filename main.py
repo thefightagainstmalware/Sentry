@@ -1,10 +1,10 @@
 import json, discord, aiohttp, os, re
 from discord.ext import tasks  # type: ignore
 from dotenv import load_dotenv
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union, cast
 
 
-class CustomClient(discord.Bot):
+class RateLimitClient(discord.Bot):
     ratelimit: int
     time_remaining: int
 
@@ -15,8 +15,8 @@ discord_invite = re.compile(
 
 
 def build_dict_data(
-    original_data: Dict[str, str],
-) -> Dict[str, Dict[str, object]]:
+    original_data: Dict[str, Union[str, int]],
+) -> Dict[str, Dict[str, Union[str, int]]]:
     """
     Builds a new dict with the original data, to not ping you every second you're online
     """
@@ -29,8 +29,8 @@ def build_dict_data(
 
 
 def build_json_data(
-    original_data: Dict[str, Dict[str, object]],
-) -> Dict[str, object]:
+    original_data: Dict[str, Dict[str, Union[str, int]]],
+) -> Dict[str, Union[str, int]]:
     new_data = {}
     if original_data is None:
         return new_data
@@ -41,12 +41,13 @@ def build_json_data(
 
 load_dotenv()
 
-client = CustomClient(debug_guilds=[910733698452815912])
+client = RateLimitClient(debug_guilds=[int(os.getenv("MAIN_GUILD_ID", ""))]) # type: ignore
+
 if not os.path.exists("players.json"):
     with open("players.json", "w") as f:
         json.dump({}, f)
 
-watched_players = build_dict_data(json.load(open("players.json"))) or {}
+watched_players = build_dict_data(json.load(open("players.json")))
 
 
 async def is_player_online(uuid: str) -> bool:
@@ -61,6 +62,11 @@ async def is_player_online(uuid: str) -> bool:
                 data = await resp.json()
                 if data["player"] is None:
                     return False
+                if (
+                    "lastLogin" not in data["player"]
+                    or data["lastLogout"] not in data["player"]
+                ):
+                    return False  # appear offline
                 return (data["player"]["lastLogin"] or 0) > (
                     data["player"]["lastLogout"] or 0
                 )
@@ -91,8 +97,8 @@ async def get_discord_info(username: str) -> Tuple[str, str]:
                 return "", uuid
 
 
-@tasks.loop(seconds=1)
-async def check_online():
+@tasks.loop(seconds=1) # type: ignore
+async def check_online() -> None:
     if hasattr(client, "ratelimit"):
         if client.ratelimit == 0 and client.time_remaining > 0:
             client.time_remaining -= 1
@@ -107,19 +113,19 @@ async def check_online():
             v["is_online"] = player_online
             if player_online:
                 print(v["discord_id"])
-                user = await client.fetch_user(v["discord_id"])
+                user = await client.fetch_user(cast(int, v["discord_id"]))
                 print(user)
                 await user.send(f"Account with uuid {k} logged in")
 
 
 @client.event
-async def on_ready():
+async def on_ready() -> None:
     print("We have logged in as {0.user}".format(client))
     check_online.start()
 
 
-@client.command()
-async def watch(ctx: discord.ApplicationContext, username: str):
+@client.command() # type: ignore
+async def watch(ctx: discord.ApplicationContext, username: str) -> None:
     global watched_players
     if watched_players and username in watched_players:
         await ctx.respond(f"{username} is already being watched!")

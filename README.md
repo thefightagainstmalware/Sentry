@@ -8,6 +8,7 @@ Create a file called '.env', and fill it like so
 ```
 HYPIXEL_API_KEY=<your hypixel api key>
 DISCORD_BOT_TOKEN=<your discord bot token>
+MAIN_GUILD_ID=<Guildid for the main server this will be used on>
 ```
 Install dependencies with `pip install -r requirements.txt`<br>
 Run the bot with `python3 main.py`<br>
