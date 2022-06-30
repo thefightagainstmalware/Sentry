@@ -1,4 +1,4 @@
-import json, discord, aiohttp, os, re
+import json, discord, aiohttp, os, re, subprocess, datetime
 from discord.ext import tasks  # type: ignore
 from dotenv import load_dotenv
 from typing import Dict, Tuple, Union, cast
@@ -9,8 +9,13 @@ class RateLimitClient(discord.Bot):
     time_remaining: int
 
 
-discord_invite = re.compile(
+discord_invite_re = re.compile(
     r"(https?:\/\/)?(www\.)?(discord\.(gg)|discord(?:app)?\.com\/invite)\/[^\s\/]+?(?=\b)"
+)
+
+uuid_re = re.compile(
+    r"[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}",
+    flags=re.IGNORECASE,
 )
 
 
@@ -41,13 +46,39 @@ def build_json_data(
 
 load_dotenv()
 
-client = RateLimitClient(debug_guilds=[int(os.getenv("MAIN_GUILD_ID", ""))]) # type: ignore
+if os.getenv("MAIN_GUILD_ID") is not None:
+    client = RateLimitClient(debug_guilds=[int(os.getenv("MAIN_GUILD_ID"))])
+else:
+    client = RateLimitClient()
 
 if not os.path.exists("players.json"):
     with open("players.json", "w") as f:
         json.dump({}, f)
 
 watched_players = build_dict_data(json.load(open("players.json")))
+if os.path.exists(".git"):
+    try:
+        VERSION = (
+            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
+            .decode("utf-8")
+            .strip()
+        )
+    except Exception:
+        VERSION = "unknown"
+else:
+    VERSION = "unknown"
+
+
+async def get_uuid(username: str) -> str:
+    async with aiohttp.ClientSession() as session:
+        if not uuid_re.match(username):
+            async with session.get(
+                "https://api.mojang.com/users/profiles/minecraft/{}".format(username)
+            ) as resp:
+                uuid: str = (await resp.json())["id"]
+        else:
+            uuid = username.replace("-", "").lower()
+        return uuid
 
 
 async def is_player_online(uuid: str) -> bool:
@@ -74,12 +105,10 @@ async def is_player_online(uuid: str) -> bool:
                 return False
 
 
-async def get_discord_info(username: str) -> Tuple[str, str]:
+async def get_discord_info(username: str = "", uuid: str = "") -> Tuple[str, str]:
     async with aiohttp.ClientSession() as session:
-        async with session.get(
-            "https://api.mojang.com/users/profiles/minecraft/{}".format(username)
-        ) as resp:
-            uuid: str = (await resp.json())["id"]
+        if uuid == "":
+            uuid = await get_uuid(username)
         async with session.get(
             f"https://api.hypixel.net/player?key={os.getenv('HYPIXEL_API_KEY')}&uuid={uuid}"
         ) as resp:
@@ -97,7 +126,7 @@ async def get_discord_info(username: str) -> Tuple[str, str]:
                 return "", uuid
 
 
-@tasks.loop(seconds=1) # type: ignore
+@tasks.loop(seconds=1)  # type: ignore
 async def check_online() -> None:
     if hasattr(client, "ratelimit"):
         if client.ratelimit == 0 and client.time_remaining > 0:
@@ -112,9 +141,7 @@ async def check_online() -> None:
         if player_online != v["is_online"]:
             v["is_online"] = player_online
             if player_online:
-                print(v["discord_id"])
                 user = await client.fetch_user(cast(int, v["discord_id"]))
-                print(user)
                 await user.send(f"Account with uuid {k} logged in")
 
 
@@ -122,23 +149,33 @@ async def check_online() -> None:
 async def on_ready() -> None:
     print("We have logged in as {0.user}".format(client))
     check_online.start()
+    await client.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.watching, name=" the gates of Hypixel"
+        )
+    )
 
 
-@client.command() # type: ignore
-async def watch(ctx: discord.ApplicationContext, username: str) -> None:
+@client.command()  # type: ignore
+async def watch(
+    ctx: discord.ApplicationContext, username: str = "", uuid: str = ""
+) -> None:
+    """Watch your Minecraft account"""
     global watched_players
     if watched_players and username in watched_players:
         await ctx.respond(f"{username} is already being watched!")
         return
-    discord_username, uuid = await get_discord_info(username)
+    if username == "" and uuid == "":
+        await ctx.respond("You need to provide a username or uuid")
+        return
+    discord_username, uuid = await get_discord_info(username, uuid)
     if discord_username == "":
         await ctx.respond(
             "I couldn't find your discord informaton! Link it to your Hypixel profile!"
         )
         return
     elif discord_username != str(ctx.author):
-        if discord_invite.match(discord_username):
-            print("Found invite")
+        if discord_invite_re.fullmatch(discord_username):
             url = discord_username
             try:
                 invite = await client.fetch_invite(url)
@@ -165,6 +202,42 @@ async def watch(ctx: discord.ApplicationContext, username: str) -> None:
     watched_players[uuid] = {"discord_id": ctx.author.id, "is_online": False}  # type: ignore
     await ctx.respond(f"Your account is now being watched!")
     json.dump(build_json_data(watched_players), open("players.json", "w"))
+
+
+@client.command()  # type: ignore
+async def unwatch(
+    ctx: discord.ApplicationContext, username: str = "", uuid: str = ""
+) -> None:
+    """Unwatch your Minecraft account"""
+    global watched_players
+    if username == "" and uuid == "":
+        await ctx.respond("You need to specify a username or uuid!")
+        return
+    if username != "":
+        uuid = await get_uuid(username)
+    if uuid in watched_players:
+        if watched_players[uuid]["discord_id"] != ctx.author.id:
+            await ctx.respond(f"You can't unwatch someone else!")
+            return
+        await ctx.respond(f"You are no longer being watched!")
+        del watched_players[uuid]
+        json.dump(build_json_data(watched_players), open("players.json", "w"))
+    else:
+        await ctx.respond(f"You are not being watched!")
+
+
+@client.command()  # type: ignore
+async def info(ctx: discord.ApplicationContext) -> None:
+    """Get information about the bot"""
+    info_embed = discord.Embed(
+        title=client.user.name,
+        description="This bot is a bot that watches your Hypixel account and sends you a message when you log in.\nFork me on GitHub: https://github.com/thefightagainstmalware/Sentry",
+        color=discord.Color.blue(),
+    )
+    info_embed.set_footer(
+        text=f"{client.user.name} ver: {VERSION}", icon_url=client.user.avatar.url
+    )
+    await ctx.respond(embed=info_embed)
 
 
 client.run(os.getenv("DISCORD_TOKEN"))
