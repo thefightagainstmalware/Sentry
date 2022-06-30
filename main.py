@@ -1,7 +1,7 @@
-import json, discord, aiohttp, os, re, subprocess, datetime
+import json, discord, aiohttp, os, re, subprocess
 from discord.ext import tasks  # type: ignore
 from dotenv import load_dotenv
-from typing import Dict, Tuple, Union, cast
+from typing import Dict, Tuple, Union, cast, no_type_check
 
 
 class RateLimitClient(discord.Bot):
@@ -47,9 +47,9 @@ def build_json_data(
 load_dotenv()
 
 if os.getenv("MAIN_GUILD_ID") is not None:
-    client = RateLimitClient(debug_guilds=[int(os.getenv("MAIN_GUILD_ID"))])
+    client = RateLimitClient(debug_guilds=[int(os.getenv("MAIN_GUILD_ID"))]) # type: ignore
 else:
-    client = RateLimitClient()
+    client = RateLimitClient() # type: ignore
 
 if not os.path.exists("players.json"):
     with open("players.json", "w") as f:
@@ -150,7 +150,7 @@ async def on_ready() -> None:
     print("We have logged in as {0.user}".format(client))
     check_online.start()
     await client.change_presence(
-        activity=discord.Activity(
+        activity=discord.Activity( # type: ignore
             type=discord.ActivityType.watching, name=" the gates of Hypixel"
         )
     )
@@ -216,7 +216,7 @@ async def unwatch(
     if username != "":
         uuid = await get_uuid(username)
     if uuid in watched_players:
-        if watched_players[uuid]["discord_id"] != ctx.author.id:
+        if watched_players[uuid]["discord_id"] != ctx.author.id: # type: ignore
             await ctx.respond(f"You can't unwatch someone else!")
             return
         await ctx.respond(f"You are no longer being watched!")
@@ -225,7 +225,7 @@ async def unwatch(
     else:
         await ctx.respond(f"You are not being watched!")
 
-
+@no_type_check
 @client.command()  # type: ignore
 async def info(ctx: discord.ApplicationContext) -> None:
     """Get information about the bot"""
