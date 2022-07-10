@@ -1,7 +1,7 @@
 import json, discord, aiohttp, os, re, subprocess
-from discord.ext import tasks  # type: ignore
+from discord.ext import tasks # type: ignore
 from dotenv import load_dotenv
-from typing import Dict, Tuple, Union, cast, no_type_check
+from typing import Any, Dict, Tuple, Union, cast, no_type_check
 
 
 class RateLimitClient(discord.Bot):
@@ -47,9 +47,9 @@ def build_json_data(
 load_dotenv()
 
 if os.getenv("MAIN_GUILD_ID") is not None:
-    client = RateLimitClient(debug_guilds=[int(os.getenv("MAIN_GUILD_ID"))]) # type: ignore
+    client = RateLimitClient(debug_guilds=[int(os.getenv("MAIN_GUILD_ID", ""))])
 else:
-    client = RateLimitClient() # type: ignore
+    client = RateLimitClient()
 
 if not os.path.exists("players.json"):
     with open("players.json", "w") as f:
@@ -126,7 +126,7 @@ async def get_discord_info(username: str = "", uuid: str = "") -> Tuple[str, str
                 return "", uuid
 
 
-@tasks.loop(seconds=1)  # type: ignore
+@tasks.loop(seconds = 1/3 * len(watched_players))
 async def check_online() -> None:
     if hasattr(client, "ratelimit"):
         if client.ratelimit == 0 and client.time_remaining > 0:
@@ -225,8 +225,9 @@ async def unwatch(
     else:
         await ctx.respond(f"You are not being watched!")
 
+
 @no_type_check
-@client.command()  # type: ignore
+@client.command()
 async def info(ctx: discord.ApplicationContext) -> None:
     """Get information about the bot"""
     info_embed = discord.Embed(
