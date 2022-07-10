@@ -1,5 +1,5 @@
 import json, discord, aiohttp, os, re, subprocess
-from discord.ext import tasks # type: ignore
+from discord.ext import tasks  # type: ignore
 from dotenv import load_dotenv
 from typing import Any, Dict, Tuple, Union, cast, no_type_check
 
@@ -126,7 +126,7 @@ async def get_discord_info(username: str = "", uuid: str = "") -> Tuple[str, str
                 return "", uuid
 
 
-@tasks.loop(seconds = 1/3 * len(watched_players))
+@tasks.loop(seconds=1 / 3 * len(watched_players))
 async def check_online() -> None:
     if hasattr(client, "ratelimit"):
         if client.ratelimit == 0 and client.time_remaining > 0:
@@ -150,7 +150,7 @@ async def on_ready() -> None:
     print("We have logged in as {0.user}".format(client))
     check_online.start()
     await client.change_presence(
-        activity=discord.Activity( # type: ignore
+        activity=discord.Activity(  # type: ignore
             type=discord.ActivityType.watching, name=" the gates of Hypixel"
         )
     )
@@ -216,7 +216,7 @@ async def unwatch(
     if username != "":
         uuid = await get_uuid(username)
     if uuid in watched_players:
-        if watched_players[uuid]["discord_id"] != ctx.author.id: # type: ignore
+        if watched_players[uuid]["discord_id"] != ctx.author.id:  # type: ignore
             await ctx.respond(f"You can't unwatch someone else!")
             return
         await ctx.respond(f"You are no longer being watched!")
