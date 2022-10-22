@@ -1,5 +1,6 @@
 # Sentry
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)![uptime](https://still-shadow-f3a2.thefightagainstmalware.workers.dev/)<br>
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 Watches your hypixel account and notifies you via discord if you login.
 If it says you logged in, but you didn't, your account may be stolen.<br>
 A live bot is (sometimes) running with discord id 987115802912247908. Invite with https://discord.com/api/oauth2/authorize?client_id=987115802912247908&permissions=8&scope=bot%20applications.commands
